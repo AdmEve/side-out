@@ -4,12 +4,15 @@
  * All distances are in design-space units (the world is 900 x 1500).
  */
 
-export const WORLD = { w: 900, h: 1500 } as const;
+// Portrait, tuned close to a common phone aspect ratio (~19.5:9) so
+// Phaser's letterboxed FIT scaling leaves only a thin margin instead of
+// large blank bars on real devices.
+export const WORLD = { w: 900, h: 1920 } as const;
 
 export const ARENA = {
   cx: 450,
-  cy: 872,
-  radius: 408,
+  cy: 950,
+  radius: 420,
   /** Arena radius multiplier once the walls have fully closed in. */
   minRadiusScale: 0.74,
   /** Seconds into the match when the walls start closing. */

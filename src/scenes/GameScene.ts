@@ -303,8 +303,9 @@ export class GameScene extends Phaser.Scene {
     const shade = this.add.graphics();
     shade.fillStyle(0x05060f, 0.86);
     shade.fillRect(0, 0, WORLD.w, WORLD.h);
+    const mid = WORLD.h / 2;
     const title = this.add
-      .text(WORLD.w / 2, 560, t('paused'), {
+      .text(WORLD.w / 2, mid - 190, t('paused'), {
         fontFamily: FONT,
         fontSize: '64px',
         color: hex(COLORS.text),
@@ -312,7 +313,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
     layer.add([shade, title]);
     layer.add(
-      makeButton(this, WORLD.w / 2, 720, t('resume'), () => this.togglePause(), {
+      makeButton(this, WORLD.w / 2, mid - 30, t('resume'), () => this.togglePause(), {
         width: 320,
         height: 86,
         fontSize: 34,
@@ -320,14 +321,14 @@ export class GameScene extends Phaser.Scene {
       }).container,
     );
     layer.add(
-      makeButton(this, WORLD.w / 2, 830, t('quitToMenu'), () => this.scene.start('Menu'), {
+      makeButton(this, WORLD.w / 2, mid + 80, t('quitToMenu'), () => this.scene.start('Menu'), {
         width: 320,
         height: 72,
         fontSize: 26,
         color: COLORS.warn,
       }).container,
     );
-    layer.add(label(this, WORLD.w / 2, 930, t('resumeHint'), 18, COLORS.textDim));
+    layer.add(label(this, WORLD.w / 2, mid + 180, t('resumeHint'), 18, COLORS.textDim));
     this.pauseLayer = layer;
   }
 }

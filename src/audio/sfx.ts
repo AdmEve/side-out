@@ -7,12 +7,32 @@ import { clamp } from '../core/geometry.ts';
 export class Sfx {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
-  enabled = true;
+  private musicGain: GainNode | null = null;
+  private musicFilter: BiquadFilterNode | null = null;
+  private musicStarted = false;
+  private arpStep = 0;
+  private _enabled = true;
+
+  get enabled(): boolean {
+    return this._enabled;
+  }
+
+  /** Muting fades the music bed rather than stopping it, so toggling sound
+   * back on resumes instantly instead of re-triggering the whole engine. */
+  set enabled(v: boolean) {
+    this._enabled = v;
+    if (this.ctx && this.musicGain) {
+      const now = this.ctx.currentTime;
+      this.musicGain.gain.cancelScheduledValues(now);
+      this.musicGain.gain.linearRampToValueAtTime(v ? 0.2 : 0, now + 0.4);
+    }
+  }
 
   /** Must be called from inside a user gesture or browsers keep audio muted. */
   unlock(): void {
     if (this.ctx) {
       if (this.ctx.state === 'suspended') void this.ctx.resume();
+      if (!this.musicStarted) this.startMusic();
       return;
     }
     try {
@@ -22,9 +42,87 @@ export class Sfx {
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.35;
       this.master.connect(this.ctx.destination);
+      this.startMusic();
     } catch {
       this.ctx = null;
     }
+  }
+
+  // --------------------------------------------------------------- music
+  //
+  // No audio files here either — a sustained, filter-swept pad under a slow
+  // arpeggio, all synthesised, so the ambience ships in the same few
+  // kilobytes as everything else in this file.
+
+  private readonly arpScale = [220, 261.63, 293.66, 329.63, 392, 440, 392, 329.63];
+
+  private startMusic(): void {
+    if (this.musicStarted || !this.ctx) return;
+    this.musicStarted = true;
+
+    const ctx = this.ctx;
+    const gain = ctx.createGain();
+    gain.gain.value = this._enabled ? 0.2 : 0;
+    gain.connect(ctx.destination);
+    this.musicGain = gain;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 700;
+    filter.connect(gain);
+    this.musicFilter = filter;
+
+    // A slow-breathing chord — A minor, an octave and a fifth down — under
+    // the arena.
+    for (const freq of [110, 130.81, 164.81, 220]) {
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      const padGain = ctx.createGain();
+      padGain.gain.value = 0.05;
+      osc.connect(padGain);
+      padGain.connect(filter);
+      osc.start();
+    }
+
+    this.sweepFilter();
+    this.scheduleArp();
+  }
+
+  private sweepFilter(): void {
+    if (!this.ctx || !this.musicFilter) return;
+    const now = this.ctx.currentTime;
+    const next = 380 + Math.random() * 640;
+    this.musicFilter.frequency.cancelScheduledValues(now);
+    this.musicFilter.frequency.setValueAtTime(this.musicFilter.frequency.value, now);
+    this.musicFilter.frequency.linearRampToValueAtTime(next, now + 6);
+    window.setTimeout(() => this.sweepFilter(), 6000);
+  }
+
+  private scheduleArp(): void {
+    window.setTimeout(() => {
+      if (this._enabled && this.ctx && this.musicGain) {
+        this.musicNote(this.arpScale[this.arpStep % this.arpScale.length]);
+      }
+      this.arpStep++;
+      this.scheduleArp();
+    }, 550);
+  }
+
+  private musicNote(freq: number): void {
+    if (!this.ctx || !this.musicGain) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const amp = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+    amp.gain.setValueAtTime(0.0001, now);
+    amp.gain.exponentialRampToValueAtTime(0.1, now + 0.05);
+    amp.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+    osc.connect(amp);
+    amp.connect(this.musicGain);
+    osc.start(now);
+    osc.stop(now + 0.55);
   }
 
   private tone(

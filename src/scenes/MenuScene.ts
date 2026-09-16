@@ -5,7 +5,7 @@ import { sfx } from '../audio/sfx.ts';
 import { setBackHandler } from '../platform/native.ts';
 import { load, save } from '../storage.ts';
 import { formatClock, label, makeButton, makeChoiceRow } from '../render/ui.ts';
-import { digits, getLocale, mo, mx, setLocale, t } from '../i18n/index.ts';
+import { digits, getLocale, isRtl, mo, mx, setLocale, t } from '../i18n/index.ts';
 
 /** A small dot bullet, used ahead of every section label. */
 function bullet(scene: Phaser.Scene, x: number, y: number, color: number): void {
@@ -20,6 +20,10 @@ export class MenuScene extends Phaser.Scene {
   private preview!: Phaser.GameObjects.Graphics;
   private controlsHint!: Phaser.GameObjects.Text;
   private drift!: Phaser.GameObjects.Particles.ParticleEmitter;
+
+  /** Center and radius of the decorative spinning-arena preview. */
+  private static readonly PREVIEW_CY = 610;
+  private static readonly PREVIEW_R = 250;
 
   constructor() {
     super('Menu');
@@ -76,9 +80,13 @@ export class MenuScene extends Phaser.Scene {
     ).container.setDepth(5);
 
     // --- title -----------------------------------------------------------
-    label(this, WORLD.w / 2, 78, t('survivalArena'), 15, COLORS.accent)
-      .setAlpha(0.75)
-      .setLetterSpacing(6);
+    // Letter-spacing forces every glyph to render in isolation, which breaks
+    // the cursive joining Persian script depends on — readable only in the
+    // Latin locale.
+    const kicker = label(this, WORLD.w / 2, 78, t('survivalArena'), 15, COLORS.accent).setAlpha(
+      0.75,
+    );
+    if (!isRtl()) kicker.setLetterSpacing(6);
 
     const title = this.add
       .text(WORLD.w / 2, 168, 'SIDE OUT', {
@@ -106,11 +114,11 @@ export class MenuScene extends Phaser.Scene {
     // --- live arena preview -----------------------------------------------
     // A turning octagon behind nothing but the void — the match, in miniature,
     // and the first thing that tells a new player what kind of game this is.
-    this.add.circle(WORLD.w / 2, 540, 232, COLORS.accent, 0.035);
+    this.add.circle(WORLD.w / 2, MenuScene.PREVIEW_CY, MenuScene.PREVIEW_R + 32, COLORS.accent, 0.035);
 
     // --- setup card ---------------------------------------------------
     const cardX = 72;
-    const cardY = 800;
+    const cardY = 940;
     const cardW = WORLD.w - cardX * 2;
     const cardH = 372;
     const card = this.add.graphics();
@@ -156,7 +164,7 @@ export class MenuScene extends Phaser.Scene {
     this.refreshControlsHint();
 
     // --- play CTA -----------------------------------------------------
-    const playY = cardY + cardH + 92;
+    const playY = cardY + cardH + 100;
     const glow = this.add.circle(WORLD.w / 2, playY, 150, COLORS.good, 0.08);
     this.tweens.add({
       targets: glow,
@@ -183,7 +191,7 @@ export class MenuScene extends Phaser.Scene {
     const soundBtn = makeButton(
       this,
       WORLD.w / 2,
-      playY + 116,
+      playY + 122,
       this.soundOn ? t('soundOn') : t('soundOff'),
       () => {
         this.soundOn = !this.soundOn;
@@ -197,7 +205,7 @@ export class MenuScene extends Phaser.Scene {
     label(
       this,
       WORLD.w / 2,
-      playY + 178,
+      playY + 188,
       saved.bestTime > 0
         ? `${t('bestRun')} ${digits(formatClock(saved.bestTime))}   ·   ${t('wins')} ${digits(saved.wins)}/${digits(saved.played)}`
         : t('noRunsYet'),
@@ -205,7 +213,7 @@ export class MenuScene extends Phaser.Scene {
       COLORS.textFaint,
     );
 
-    label(this, WORLD.w / 2, WORLD.h - 34, t('footerTag'), 13, COLORS.textFaint).setAlpha(0.6);
+    label(this, WORLD.w / 2, WORLD.h - 60, t('footerTag'), 13, COLORS.textFaint).setAlpha(0.6);
 
     this.input.once('pointerdown', () => sfx.unlock());
 
@@ -226,8 +234,8 @@ export class MenuScene extends Phaser.Scene {
     this.spin += delta * 0.00011;
     const g = this.preview;
     const cx = WORLD.w / 2;
-    const cy = 540;
-    const r = 218;
+    const cy = MenuScene.PREVIEW_CY;
+    const r = MenuScene.PREVIEW_R;
     g.clear();
 
     const verts = regularPolygon(8, cx, cy, r, this.spin);

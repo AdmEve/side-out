@@ -37,6 +37,7 @@ export function makeButton(
       fontFamily: FONT,
       fontSize: `${fontSize}px`,
       color: '#ffffff',
+      padding: { left: 10, right: 10, top: 8, bottom: 8 },
     })
     .setOrigin(0.5);
 
@@ -77,9 +78,16 @@ export function makeButton(
   };
   redraw();
 
+  // Phaser always adds a Container's displayOrigin (fixed at width/2,
+  // height/2 — see Container.js, "do not change this value") to the pointer's
+  // local coordinates before testing the hit area. A hit area centred on the
+  // container's own origin (-w/2..w/2) therefore gets that offset added a
+  // second time, shifting the region that actually responds to taps into the
+  // button's top-left quadrant. The hit area must be specified in the same
+  // top-left-anchored space Phaser tests against: (0, 0, w, h).
   container
     .setInteractive({
-      hitArea: new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h),
+      hitArea: new Phaser.Geom.Rectangle(0, 0, w, h),
       hitAreaCallback: Phaser.Geom.Rectangle.Contains,
       cursor: 'pointer',
     })
@@ -164,6 +172,7 @@ export function label(
       fontFamily: FONT,
       fontSize: `${size}px`,
       color: hex(color),
+      padding: { left: 6, right: 6, top: 4, bottom: 4 },
     })
     .setOrigin(origin, 0.5);
 }

@@ -67,8 +67,8 @@ export class ResultsScene extends Phaser.Scene {
     );
 
     // --- leaderboard -------------------------------------------------------
-    const top = 300;
-    const rowH = 66;
+    const top = 340;
+    const rowH = 84;
     label(this, mx(200), top - 40, t('colPlayer'), 16, COLORS.textFaint, mo(0));
     label(this, mx(WORLD.w - 300), top - 40, t('colSurvived'), 16, COLORS.textFaint, mo(0));
     label(this, mx(WORLD.w - 120), top - 40, t('colSaves'), 16, COLORS.textFaint, mo(1));
@@ -92,23 +92,32 @@ export class ResultsScene extends Phaser.Scene {
       label(this, mx(WORLD.w - 120), y, digits(r.saves), 22, COLORS.textDim, mo(1));
     });
 
+    // Anchored below the leaderboard's actual bottom rather than the world
+    // height, so the gap stays the same regardless of the world's aspect
+    // ratio (a fixed WORLD.h - N offset would leave a huge dead gap once the
+    // world got tall enough to fill a modern phone screen).
+    const leaderboardBottom = top + summary.length * rowH;
+    const bestRunY = leaderboardBottom + 110;
+    const rematchY = bestRunY + 100;
+    const menuY = rematchY + 96;
+
     const rec = load();
     label(
       this,
       WORLD.w / 2,
-      WORLD.h - 250,
+      bestRunY,
       `${t('bestRun')} ${digits(formatClock(rec.bestTime))}   ·   ${t('wins')} ${digits(rec.wins)}/${digits(rec.played)}`,
       19,
       COLORS.textDim,
     );
 
-    makeButton(this, WORLD.w / 2, WORLD.h - 160, t('rematch'), () => this.scene.start('Game', data.opts), {
+    makeButton(this, WORLD.w / 2, rematchY, t('rematch'), () => this.scene.start('Game', data.opts), {
       width: 340,
       height: 88,
       fontSize: 36,
       color: COLORS.good,
     });
-    makeButton(this, WORLD.w / 2, WORLD.h - 62, t('menu'), () => this.scene.start('Menu'), {
+    makeButton(this, WORLD.w / 2, menuY, t('menu'), () => this.scene.start('Menu'), {
       width: 240,
       height: 58,
       fontSize: 24,
