@@ -1,0 +1,77 @@
+name: Build Android APK
+
+# Builds the SIDE OUT debug APK on GitHub's own servers (full internet access
+# there, unlike the sandbox this workflow was authored in) and republishes it
+# to a rolling "latest" release every time — so there's always exactly one
+# stable, no-login-required download link for the newest build:
+#   https://github.com/<owner>/<repo>/releases/tag/latest
+#
+# Runs on every push to main, and can also be triggered by hand from the
+# Actions tab (or the GitHub app) with no code change required — click
+# "Run workflow" on this workflow in the Actions tab.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Build the web bundle
+        run: npm run build
+
+      - name: Sync into the Capacitor Android project
+        run: npx cap sync android
+
+      - name: Make sure the SDK bits this project needs are installed
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Build the debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Collect the APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             "out/side-out-debug-run${{ github.run_number }}.apk"
+
+      - name: Upload as a workflow artifact (build history)
+        uses: actions/upload-artifact@v4
+        with:
+          name: side-out-debug-apk
+          path: out/*.apk
+
+      - name: Publish/refresh the "latest" release with this APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest build (run #${{ github.run_number }})"
+          prerelease: true
+          files: out/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

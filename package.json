@@ -1,0 +1,30 @@
+{
+  "name": "side-out",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "SIDE OUT \u2014 8-player survival pong",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "vite build",
+    "preview": "vite preview",
+    "sim": "tsx tools/sim.ts",
+    "browser-test": "node tools/browser-test.mjs",
+    "android": "npm run build && cap sync android && cap open android",
+    "android:apk": "npm run build && cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.1",
+    "phaser": "^3.90.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2"
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SIDE OUT</string>
+    <string name="title_activity_main">SIDE OUT</string>
+    <string name="package_name">gg.sideout.pong</string>
+    <string name="custom_url_scheme">gg.sideout.pong</string>
+</resources>
