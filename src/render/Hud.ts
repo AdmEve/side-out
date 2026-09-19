@@ -58,6 +58,7 @@ export class Hud {
   // running, and it turns "it feels choppy" into a number and a timestamp.
   // Remove or gate behind a settings toggle once we're done tuning.
   private readonly perfText: Phaser.GameObjects.Text;
+  private readonly stutterText: Phaser.GameObjects.Text;
   private readonly scene: Phaser.Scene;
   private minFps = Infinity;
   private minFpsWindowStart = 0;
@@ -76,6 +77,7 @@ export class Hud {
     this.aliveText = label(scene, mx(44), 78, '', 22, COLORS.textDim, mo(0)).setDepth(10);
     this.ballsText = label(scene, mx(WORLD.w - 44), 78, '', 22, COLORS.textDim, mo(1)).setDepth(10);
     this.perfText = label(scene, mx(44), 108, '', 13, COLORS.textFaint, mo(0)).setDepth(10);
+    this.stutterText = label(scene, mx(44), 126, '', 13, COLORS.warn, mo(0)).setDepth(10).setAlpha(0.85);
 
     makeButton(scene, WORLD.w / 2, 156, t('pause'), cb.onPause, {
       width: 170,
@@ -135,11 +137,11 @@ export class Hud {
     });
   }
 
-  update(m: MatchState): void {
+  update(m: MatchState, stutter = ''): void {
     this.clockText.setText(digits(formatClock(m.time)));
     this.aliveText.setText(`${t('left')} ${digits(m.aliveCount)}/${digits(m.players.length)}`);
     this.ballsText.setText(`${t('balls')} ${digits(m.balls.filter((b) => b.active).length)}`);
-    this.updatePerf(m);
+    this.updatePerf(m, stutter);
 
     const esc = escalation(m);
     this.status.setText(esc.text).setColor(hex(esc.color));
@@ -161,7 +163,7 @@ export class Hud {
    * single bad frame doesn't get averaged away), and exactly how much is on
    * screen right now, so a drop can be tied to the moment it happened.
    */
-  private updatePerf(m: MatchState): void {
+  private updatePerf(m: MatchState, stutter: string): void {
     const fps = this.scene.game.loop.actualFps;
     if (m.time - this.minFpsWindowStart > 2) {
       this.minFps = fps;
@@ -173,6 +175,9 @@ export class Hud {
     this.perfText.setText(
       `${Math.round(fps)} fps (min ${Math.round(this.minFps)}) · ${balls}b/${m.hazards.length}h/${m.powerups.length}p`,
     );
+    // Sticky — stays on screen after the hitch passes so there's time to
+    // actually read it, rather than flashing by in the same frame it fired.
+    if (stutter) this.stutterText.setText(`last stutter: ${stutter}`);
   }
 
   setHint(text: string): void {

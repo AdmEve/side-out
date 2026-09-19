@@ -32,6 +32,15 @@ export class GameScene extends Phaser.Scene {
   private finished = false;
   private pauseLayer?: Phaser.GameObjects.Container;
 
+  // --- stutter attribution ---------------------------------------------
+  // "Mostly 60fps with the odd hitch" points at a frame-time spike, not
+  // sustained overdraw — likely a burst of one-time work (particles, camera
+  // shake/flash, a synthesised sfx, a text tween) all landing on the same
+  // frame as a game event. Recording which events fired on frame N lets a
+  // slow frame N+1 be attributed to a specific cause instead of a guess.
+  private prevEventTypes: string[] = [];
+  private lastStutter = '';
+
   constructor() {
     super('Game');
   }
@@ -99,6 +108,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    // A single frame taking noticeably longer than budget (60fps = 16.7ms)
+    // is exactly what "stutter" feels like. Attribute it to whatever the
+    // previous frame processed, since that's the work that made this frame
+    // late to start.
+    if (delta > 35) {
+      this.lastStutter = this.prevEventTypes.length
+        ? `${Math.round(delta)}ms after ${[...new Set(this.prevEventTypes)].join('+')}`
+        : `${Math.round(delta)}ms (no event)`;
+    }
+
     const dt = Math.min(delta / 1000, 0.2);
 
     if (!this.isPaused && !this.finished) {
@@ -123,7 +142,7 @@ export class GameScene extends Phaser.Scene {
 
     this.arenaGfx.draw(this.match, time / 1000);
     this.fx.update(delta);
-    this.hud.update(this.match);
+    this.hud.update(this.match, this.lastStutter);
   }
 
   // ------------------------------------------------------------------ events
@@ -147,6 +166,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drainEvents(): void {
+    this.prevEventTypes = this.match.events.map((e) => e.type);
     for (const e of this.match.events) {
       switch (e.type) {
         case 'paddleHit': {
