@@ -52,7 +52,18 @@ export class Hud {
   private readonly sabotageHint: Phaser.GameObjects.Text;
   private readonly hazardButtons: { kind: HazardKind; button: Button }[] = [];
 
+  // --- perf readout ----------------------------------------------------
+  // A visible FPS/frame-time counter, on by default while we're chasing the
+  // "many balls, many hazards" frame-drop reports — cheap enough to leave
+  // running, and it turns "it feels choppy" into a number and a timestamp.
+  // Remove or gate behind a settings toggle once we're done tuning.
+  private readonly perfText: Phaser.GameObjects.Text;
+  private readonly scene: Phaser.Scene;
+  private minFps = Infinity;
+  private minFpsWindowStart = 0;
+
   constructor(scene: Phaser.Scene, m: MatchState, cb: HudCallbacks) {
+    this.scene = scene;
     this.clockText = scene.add
       .text(WORLD.w / 2, 78, '0:00', {
         fontFamily: FONT,
@@ -64,6 +75,7 @@ export class Hud {
 
     this.aliveText = label(scene, mx(44), 78, '', 22, COLORS.textDim, mo(0)).setDepth(10);
     this.ballsText = label(scene, mx(WORLD.w - 44), 78, '', 22, COLORS.textDim, mo(1)).setDepth(10);
+    this.perfText = label(scene, mx(44), 108, '', 13, COLORS.textFaint, mo(0)).setDepth(10);
 
     makeButton(scene, WORLD.w / 2, 156, t('pause'), cb.onPause, {
       width: 170,
@@ -127,6 +139,7 @@ export class Hud {
     this.clockText.setText(digits(formatClock(m.time)));
     this.aliveText.setText(`${t('left')} ${digits(m.aliveCount)}/${digits(m.players.length)}`);
     this.ballsText.setText(`${t('balls')} ${digits(m.balls.filter((b) => b.active).length)}`);
+    this.updatePerf(m);
 
     const esc = escalation(m);
     this.status.setText(esc.text).setColor(hex(esc.color));
@@ -140,6 +153,26 @@ export class Hud {
     } else {
       this.sabotage.setVisible(false);
     }
+  }
+
+  /**
+   * "It feels choppy" isn't a bug report. This turns it into one: the
+   * current FPS, the worst FPS seen in roughly the last 2 seconds (so a
+   * single bad frame doesn't get averaged away), and exactly how much is on
+   * screen right now, so a drop can be tied to the moment it happened.
+   */
+  private updatePerf(m: MatchState): void {
+    const fps = this.scene.game.loop.actualFps;
+    if (m.time - this.minFpsWindowStart > 2) {
+      this.minFps = fps;
+      this.minFpsWindowStart = m.time;
+    } else {
+      this.minFps = Math.min(this.minFps, fps);
+    }
+    const balls = m.balls.filter((b) => b.active).length;
+    this.perfText.setText(
+      `${Math.round(fps)} fps (min ${Math.round(this.minFps)}) · ${balls}b/${m.hazards.length}h/${m.powerups.length}p`,
+    );
   }
 
   setHint(text: string): void {
