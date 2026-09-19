@@ -4,11 +4,29 @@ import { COLORS, FONT } from '../config/theme.ts';
  * Particles, ripples, shatters and shake. Everything here is decoration —
  * removing it would not change a single simulation outcome.
  */
+interface Ripple {
+  x: number;
+  y: number;
+  color: number;
+  fromR: number;
+  toR: number;
+  duration: number;
+  elapsed: number;
+}
+
 export class Fx {
   private readonly sparks: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly shards: Phaser.GameObjects.Particles.ParticleEmitter;
+  // A ripple used to be its own Graphics object plus its own tween. Fine for
+  // one at a time, but a burst of hits/misses from several fast balls could
+  // have a dozen of them alive together, each independently cleared and
+  // redrawn every frame. Batched onto one shared Graphics object and stepped
+  // by hand instead, the cost stays flat no matter how many are in flight.
+  private readonly rippleGfx: Phaser.GameObjects.Graphics;
+  private readonly ripples: Ripple[] = [];
 
   constructor(private readonly scene: Phaser.Scene) {
+    this.rippleGfx = scene.add.graphics().setDepth(5).setBlendMode(Phaser.BlendModes.ADD);
     this.sparks = scene.add
       .particles(0, 0, 'spark', {
         speed: { min: 60, max: 320 },
@@ -70,21 +88,27 @@ export class Fx {
   }
 
   ripple(x: number, y: number, color: number, radius = 100, duration = 420): void {
-    const g = this.scene.add.graphics().setDepth(5).setBlendMode(Phaser.BlendModes.ADD);
-    const state = { r: 6, a: 0.8 };
-    this.scene.tweens.add({
-      targets: state,
-      r: radius,
-      a: 0,
-      duration,
-      ease: 'Cubic.easeOut',
-      onUpdate: () => {
-        g.clear();
-        g.lineStyle(3, color, state.a);
-        g.strokeCircle(x, y, state.r);
-      },
-      onComplete: () => g.destroy(),
-    });
+    this.ripples.push({ x, y, color, fromR: 6, toR: radius, duration, elapsed: 0 });
+  }
+
+  /** Steps and redraws every live ripple in one pass. Call once per frame. */
+  update(deltaMs: number): void {
+    if (this.ripples.length === 0) return;
+    const g = this.rippleGfx;
+    g.clear();
+    for (let i = this.ripples.length - 1; i >= 0; i--) {
+      const r = this.ripples[i];
+      r.elapsed += deltaMs;
+      const t = Math.min(1, r.elapsed / r.duration);
+      if (t >= 1) {
+        this.ripples.splice(i, 1);
+        continue;
+      }
+      const eased = 1 - (1 - t) ** 3; // Cubic.easeOut
+      const radius = r.fromR + (r.toR - r.fromR) * eased;
+      g.lineStyle(3, r.color, 0.8 * (1 - t));
+      g.strokeCircle(r.x, r.y, radius);
+    }
   }
 
   private current?: Phaser.GameObjects.Text;
@@ -135,5 +159,6 @@ export class Fx {
   destroy(): void {
     this.sparks.destroy();
     this.shards.destroy();
+    this.rippleGfx.destroy();
   }
 }

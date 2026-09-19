@@ -122,6 +122,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.arenaGfx.draw(this.match, time / 1000);
+    this.fx.update(delta);
     this.hud.update(this.match);
   }
 

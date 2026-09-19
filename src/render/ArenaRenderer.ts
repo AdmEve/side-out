@@ -190,16 +190,21 @@ export class ArenaRenderer {
       const fade = Math.min(1, h.life / 2) * h.arm;
       if (h.kind === 'peg') {
         const r = HAZARD.pegRadius;
-        g.fillStyle(COLORS.hazard, 0.16 * fade);
-        g.fillCircle(h.pos.x, h.pos.y, r * 2.4);
+        g.fillStyle(COLORS.hazard, 0.22 * fade);
+        g.fillCircle(h.pos.x, h.pos.y, r * 1.8);
         c.fillStyle(COLORS.hazard, 0.9 * fade);
         c.fillCircle(h.pos.x, h.pos.y, r);
         c.lineStyle(2, 0xffffff, 0.55 * fade);
         c.strokeCircle(h.pos.x, h.pos.y, r);
       } else if (h.kind === 'well') {
         const pulse = 0.7 + 0.3 * Math.sin(now * 4 + h.id);
-        g.fillStyle(COLORS.wind, 0.09 * fade * pulse);
-        g.fillCircle(h.pos.x, h.pos.y, HAZARD.wellRadius * h.arm);
+        // The pull field reaches out to the full wellRadius, but painting a
+        // fill that wide is the single most expensive thing on screen once a
+        // few wells are live at once (each one a ~130px-radius additive
+        // disc). A much smaller core plus the ring/arc strokes below reads
+        // the same "gravity well" without the overdraw.
+        g.fillStyle(COLORS.wind, 0.16 * fade * pulse);
+        g.fillCircle(h.pos.x, h.pos.y, HAZARD.wellRadius * 0.4 * h.arm);
         c.lineStyle(2, COLORS.wind, 0.4 * fade);
         c.strokeCircle(h.pos.x, h.pos.y, HAZARD.wellRadius * h.arm);
         for (let k = 0; k < 3; k++) {
@@ -294,16 +299,24 @@ export class ArenaRenderer {
     const g = this.glow;
     const c = this.core;
 
+    const activeBalls = m.balls.reduce((n, b) => (b.active ? n + 1 : n), 0);
+    // Every ball's trail is a handful of additive strokes; fine for one or
+    // two balls, but it's pure overdraw once a full escalation's worth are
+    // bouncing around together. Fewer bands per ball as the field gets
+    // busier keeps the total draw cost roughly flat instead of scaling with
+    // ball count on top of everything else in play.
+    const bands = activeBalls >= 4 ? 1 : activeBalls >= 2 ? 2 : 3;
+
     for (const ball of m.balls) {
       if (!ball.active) continue;
       const tint = ball.lastToucher === null ? 0xffffff : m.player(ball.lastToucher).color;
 
-      this.drawTrail(ball.trail, tint);
+      this.drawTrail(ball.trail, tint, bands);
 
       g.fillStyle(tint, 0.25);
-      g.fillCircle(ball.pos.x, ball.pos.y, BALL.radius * 3);
+      g.fillCircle(ball.pos.x, ball.pos.y, BALL.radius * 2.2);
       g.fillStyle(tint, 0.4);
-      g.fillCircle(ball.pos.x, ball.pos.y, BALL.radius * 1.7);
+      g.fillCircle(ball.pos.x, ball.pos.y, BALL.radius * 1.4);
 
       c.fillStyle(0xffffff, 1);
       c.fillCircle(ball.pos.x, ball.pos.y, BALL.radius);
@@ -319,11 +332,10 @@ export class ArenaRenderer {
    * polylines keeps the same taper (thin/dim near the tail, thick/bright at
    * the head) for a fraction of the draw calls.
    */
-  private drawTrail(trail: Vec[], tint: number): void {
+  private drawTrail(trail: Vec[], tint: number, bands: number): void {
     const g = this.glow;
     const n = trail.length;
     if (n < 2) return;
-    const bands = 3;
     for (let band = 0; band < bands; band++) {
       const lo = Math.floor((band / bands) * (n - 1));
       const hi = Math.floor(((band + 1) / bands) * (n - 1));
